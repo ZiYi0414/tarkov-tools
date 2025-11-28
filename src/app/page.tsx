@@ -19,81 +19,94 @@ export default function InventoryPage() {
   const [selectedLevel, setSelectedLevel] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [items, setItems] = useState<Item[]>(() => {
-    // 尝试从localStorage加载物品数据
-    const savedItems = localStorage.getItem('inventory-items')
-    if (savedItems) {
-      return JSON.parse(savedItems)
+    // 尝试从localStorage加载物品数据，但只在浏览器环境中
+    if (typeof window !== 'undefined') {
+      const savedItems = localStorage.getItem('inventory-items')
+      if (savedItems) {
+        return JSON.parse(savedItems)
+      }
     }
-    // 如果没有保存的数据，使用初始物品数据
+    // 如果没有保存的数据或不在浏览器环境中，使用初始物品数据
     return initialItems
   })
   const [selectedItem, setSelectedItem] = useState<Item | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [hideCompleted, setHideCompleted] = useState(() => {
-    // 从localStorage加载初始状态，如果没有则默认为false
-    const saved = localStorage.getItem('hide-completed-items')
-    return saved ? JSON.parse(saved) : false
+    // 从localStorage加载初始状态，但只在浏览器环境中
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('hide-completed-items')
+      return saved ? JSON.parse(saved) : false
+    }
+    // 默认值
+    return false
   })
   const [showSearchModal, setShowSearchModal] = useState(false)
 
-  // 当hideCompleted状态变更时，保存到localStorage
+  // 当hideCompleted状态变更时，保存到localStorage，但只在浏览器环境中
   useEffect(() => {
-    localStorage.setItem('hide-completed-items', JSON.stringify(hideCompleted))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hide-completed-items', JSON.stringify(hideCompleted))
+    }
   }, [hideCompleted])
 
   useEffect(() => {
-    if (activeTab === 0) {
-      // 全部选项卡时，加载所有角色的数据
-      characters.forEach((char) => {
-        const saved = localStorage.getItem(`character-${char.id}-items`)
+    // 只在浏览器环境中执行localStorage操作
+    if (typeof window !== 'undefined') {
+      if (activeTab === 0) {
+        // 全部选项卡时，加载所有角色的数据
+        characters.forEach((char) => {
+          const saved = localStorage.getItem(`character-${char.id}-items`)
+          if (saved) {
+            try {
+              const savedData = JSON.parse(saved)
+              setItems((prevItems) =>
+                prevItems.map((item) => ({
+                  ...item,
+                  owned: item.characterId === char.id ? savedData[item.id] || 0 : item.owned,
+                })),
+              )
+            } catch (e) {
+              console.error("Failed to load data:", e)
+            }
+          }
+        })
+      } else {
+        // 单个角色时，只加载该角色的数据
+        const saved = localStorage.getItem(`character-${activeTab}-items`)
         if (saved) {
           try {
             const savedData = JSON.parse(saved)
             setItems((prevItems) =>
               prevItems.map((item) => ({
                 ...item,
-                owned: item.characterId === char.id ? savedData[item.id] || 0 : item.owned,
+                owned: item.characterId === activeTab ? savedData[item.id] || 0 : item.owned,
               })),
             )
           } catch (e) {
             console.error("Failed to load data:", e)
           }
         }
-      })
-    } else {
-      // 单个角色时，只加载该角色的数据
-      const saved = localStorage.getItem(`character-${activeTab}-items`)
-      if (saved) {
-        try {
-          const savedData = JSON.parse(saved)
-          setItems((prevItems) =>
-            prevItems.map((item) => ({
-              ...item,
-              owned: item.characterId === activeTab ? savedData[item.id] || 0 : item.owned,
-            })),
-          )
-        } catch (e) {
-          console.error("Failed to load data:", e)
-        }
       }
     }
   }, [activeTab])
 
-  // 保存到 localStorage
+  // 保存到 localStorage，但只在浏览器环境中
   const saveItems = (updatedItems: Item[]) => {
-    const data: Record<string, number> = {}
-    updatedItems.forEach((item) => {
-      if (item.characterId === activeTab || activeTab === 0) {
-        data[item.id] = item.owned
-      }
-    })
-    updatedItems.forEach((item) => {
-      if (item.id === updatedItems.find((i) => i.id === item.id)?.id) {
-        const charData = JSON.parse(localStorage.getItem(`character-${item.characterId}-items`) || "{}")
-        charData[item.id] = item.owned
-        localStorage.setItem(`character-${item.characterId}-items`, JSON.stringify(charData))
-      }
-    })
+    if (typeof window !== 'undefined') {
+      const data: Record<string, number> = {}
+      updatedItems.forEach((item) => {
+        if (item.characterId === activeTab || activeTab === 0) {
+          data[item.id] = item.owned
+        }
+      })
+      updatedItems.forEach((item) => {
+        if (item.id === updatedItems.find((i) => i.id === item.id)?.id) {
+          const charData = JSON.parse(localStorage.getItem(`character-${item.characterId}-items`) || "{}")
+          charData[item.id] = item.owned
+          localStorage.setItem(`character-${item.characterId}-items`, JSON.stringify(charData))
+        }
+      })
+    }
   }
 
   // 更新物品拥有数量
